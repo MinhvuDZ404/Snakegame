@@ -1,0 +1,629 @@
+<!doctype html>
+
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Snake — Game HTML5 (khoảng 600 dòng)</title>
+  <style>
+    /* -----------------------------
+       BASIC STYLES
+       ----------------------------- */
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1724;
+      --accent:#00e6a8;
+      --muted:#9aa7b2;
+      --danger:#ff6b6b;
+      --glass: rgba(255,255,255,0.03);
+      --shadow: 0 6px 18px rgba(2,6,23,0.6);
+      --radius:12px;
+    }html,body{
+  height:100%;
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg,#071024 0%, #081427 100%);
+  color:#e6f3f0;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  box-sizing:border-box;
+}
+
+/* Container */
+.wrap{
+  width:100%;
+  max-width:980px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015));
+  border-radius:16px;
+  padding:18px;
+  box-shadow: var(--shadow);
+  display:grid;
+  grid-template-columns: 1fr 360px;
+  gap:18px;
+  align-items:start;
+}
+
+/* Left: Game area */
+.game-area{
+  background:var(--panel);
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+header h1{
+  margin:0 0 4px 0;
+  font-size:20px;
+  letter-spacing:0.4px;
+}
+header p{margin:0;color:var(--muted);font-size:13px}
+
+.canvas-wrap{
+  position:relative;
+  background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(255,255,255,0.02));
+  border-radius:10px;
+  padding:6px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+canvas{
+  background: linear-gradient(180deg,#071227 0%, #08111b 100%);
+  border-radius:8px;
+  display:block;
+  max-width:100%;
+  height:auto;
+  touch-action:none; /* prevent default touch scrolling on canvas */
+}
+
+/* Right: Controls */
+.panel{
+  background:var(--panel);
+  border-radius:12px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-height:200px;
+}
+
+.stat{display:flex;justify-content:space-between;align-items:center}
+.stat strong{font-size:18px}
+.muted{color:var(--muted);font-size:13px}
+
+.controls{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px}
+button{cursor:pointer;border:0;padding:10px 12px;border-radius:10px;background:var(--glass);color:inherit}
+button.primary{background:linear-gradient(90deg,var(--accent),#00bfa2);color:#001418;font-weight:700}
+button.danger{background:linear-gradient(90deg,var(--danger),#ff4b4b);}
+
+label{font-size:13px;color:var(--muted)}
+input[type=range]{width:100%}
+select{padding:8px;border-radius:8px;background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.04)}
+
+.footer{font-size:12px;color:var(--muted);text-align:center;padding-top:6px}
+
+/* Mobile layout */
+@media(max-width:920px){
+  .wrap{grid-template-columns:1fr;}
+}
+
+  </style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Snake Game">
+    <div class="game-area">
+      <header>
+        <h1>Snake — Phiên bản HTML5</h1>
+        <p>Tương thích mobile & desktop — di chuyển: phím mũi tên / WASD / vuốt</p>
+      </header><div class="canvas-wrap">
+    <!-- Canvas sẽ được scale để vừa khung -->
+    <canvas id="gameCanvas" width="600" height="600" aria-label="Vùng chơi Snake"></canvas>
+  </div>
+
+  <div class="footer muted">Lưu ý: trò chơi lưu High Score trong trình duyệt (localStorage).</div>
+</div>
+
+<aside class="panel" aria-label="Bảng điều khiển">
+  <div class="stat">
+    <div>
+      <div class="muted">Điểm</div>
+      <strong id="score">0</strong>
+    </div>
+    <div>
+      <div class="muted">High Score</div>
+      <strong id="highScore">0</strong>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div>
+      <label for="gridSize">Kích thước lưới</label>
+      <select id="gridSize" title="Chọn kích thước lưới">
+        <option value="16">16 x 16 (tiêu chuẩn)</option>
+        <option value="20">20 x 20 (mượt hơn)</option>
+        <option value="24">24 x 24 (chật hơn)</option>
+        <option value="12">12 x 12 (to hơn)</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="speedRange">Tốc độ (FPS)</label>
+      <input id="speedRange" type="range" min="4" max="18" value="10">
+      <div class="muted">FPS hiện tại: <span id="fpsVal">10</span></div>
+    </div>
+
+    <div class="row">
+      <button id="startBtn" class="primary">Bắt đầu</button>
+      <button id="pauseBtn">Tạm dừng</button>
+      <button id="resetBtn" class="danger">Đặt lại</button>
+    </div>
+
+    <div>
+      <label>Hướng dẫn</label>
+      <div class="muted">Phím mũi tên / WASD để di chuyển. Vuốt trên mobile. Ăn thức ăn để cộng điểm và dài hơn.</div>
+    </div>
+
+    <div>
+      <label>Âm thanh</label>
+      <div class="row">
+        <button id="toggleSound">Bật/Tắt</button>
+        <button id="exportBtn">Xuất cấu hình</button>
+      </div>
+    </div>
+
+    <div>
+      <label>Ghi chú cho lập trình viên</label>
+      <div class="muted">Phiên bản đơn file, có thể nhúng vào app WebView Android/iOS hoặc GitHub Pages.</div>
+    </div>
+  </div>
+
+</aside>
+
+  </div>  <script>
+    /* -------------------------------------
+       SNAKE GAME JAVASCRIPT
+       - Single file
+       - Grid-based movement
+       - Mobile touch support (swipe)
+       - High score stored in localStorage
+       - Adjustable grid and FPS
+       ------------------------------------- */
+
+    // DOM
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('highScore');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const gridSelect = document.getElementById('gridSize');
+    const speedRange = document.getElementById('speedRange');
+    const fpsVal = document.getElementById('fpsVal');
+    const toggleSoundBtn = document.getElementById('toggleSound');
+    const exportBtn = document.getElementById('exportBtn');
+
+    // Game settings (mutable)
+    const SETTINGS = {
+      gridCount: parseInt(gridSelect.value, 10),
+      fps: Number(speedRange.value),
+      cellSize: 0, // computed
+      width: canvas.width,
+      height: canvas.height,
+      sound: true,
+    };
+
+    // Game state
+    let snake = []; // array of {x,y}
+    let direction = {x:1,y:0};
+    let nextDirection = null; // buffer to prevent 180-degree turns
+    let apple = null; // {x,y}
+    let score = 0;
+    let highScore = 0;
+    let tickInterval = null; // for game loop setInterval
+    let running = false;
+    let paused = false;
+
+    // Input / touch
+    let touchStart = null;
+    const SWIPE_MIN = 20; // px
+
+    // Sounds (simple beep using WebAudio)
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function beep(freq=440, duration=0.06, type='sine', gain=0.05){
+      if(!SETTINGS.sound) return;
+      try{
+        if(!audioCtx) audioCtx = new AudioCtx();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = type; o.frequency.value = freq;
+        g.gain.value = gain;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start();
+        setTimeout(()=>{ try{ o.stop(); }catch(e){} }, duration*1000);
+      }catch(e){/* audio blocked or unsupported */}
+    }
+
+    // ---------- Utilities ----------
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+    // ---------- Persistent high score ----------
+    const HS_KEY = 'snake_highscore_v1';
+    function loadHighScore(){
+      try{
+        const raw = localStorage.getItem(HS_KEY);
+        if(raw!==null) highScore = parseInt(raw,10) || 0;
+      }catch(e){ highScore = 0; }
+      highScoreEl.textContent = highScore;
+    }
+    function saveHighScore(){
+      try{ localStorage.setItem(HS_KEY, String(highScore)); }catch(e){}
+      highScoreEl.textContent = highScore;
+    }
+
+    // ---------- Game initialization ----------
+    function computeCellSize(){
+      SETTINGS.cellSize = Math.floor(Math.min(SETTINGS.width, SETTINGS.height) / SETTINGS.gridCount);
+    }
+
+    function resetGame(initialize=true){
+      // center snake
+      snake = [];
+      const mid = Math.floor(SETTINGS.gridCount/2);
+      snake.push({x:mid-1,y:mid});
+      snake.push({x:mid,y:mid});
+      snake.push({x:mid+1,y:mid});
+      direction = {x:1,y:0};
+      nextDirection = null;
+      score = 0;
+      running = !initialize ? false : running;
+      paused = false;
+      placeApple();
+      updateScore();
+    }
+
+    function placeApple(){
+      // place apple not on snake
+      const max = SETTINGS.gridCount-1;
+      let tries=0;
+      do{
+        apple = {x:randInt(0,max), y:randInt(0,max)};
+        tries++;
+        if(tries>1000) break;
+      }while(snake.some(s=>s.x===apple.x && s.y===apple.y));
+    }
+
+    function updateScore(){
+      scoreEl.textContent = score;
+      if(score>highScore){ highScore = score; saveHighScore(); }
+    }
+
+    // ---------- Rendering ----------
+    function clearCanvas(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+
+    function drawGrid(){
+      const cs = SETTINGS.cellSize;
+      // optional subtle grid lines — commented to keep performance
+      // ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+      // for(let i=0;i<=SETTINGS.gridCount;i++){ ctx.beginPath(); ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,cs*SETTINGS.gridCount); ctx.stroke(); }
+      // for(let j=0;j<=SETTINGS.gridCount;j++){ ctx.beginPath(); ctx.moveTo(0,j*cs); ctx.lineTo(cs*SETTINGS.gridCount,j*cs); ctx.stroke(); }
+    }
+
+    function drawCell(x,y,opts={}){
+      const cs = SETTINGS.cellSize;
+      const px = x*cs;
+      const py = y*cs;
+      const pad = Math.max(1, Math.floor(cs*0.08));
+      const w = cs - pad*2;
+      const h = cs - pad*2;
+
+      ctx.save();
+      if(opts.gradient){
+        const g = ctx.createLinearGradient(px,py,px+w,py+h);
+        g.addColorStop(0, opts.gradient[0]);
+        g.addColorStop(1, opts.gradient[1]);
+        ctx.fillStyle = g;
+      }else{
+        ctx.fillStyle = opts.fill || '#00e6a8';
+      }
+      // rounded rect
+      roundRect(ctx, px+pad, py+pad, w, h, Math.max(2, Math.floor(cs*0.12)), true, false);
+      ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r, fill, stroke){
+      if (typeof r === 'undefined') r = 5;
+      if (typeof stroke === 'undefined') stroke = true;
+      if (typeof fill === 'undefined') fill = true;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    function render(){
+      clearCanvas();
+      drawGrid();
+
+      // draw apple
+      if(apple){
+        drawCell(apple.x, apple.y, {gradient:['#ff8a65','#ff3d00']});
+      }
+
+      // draw snake body
+      for(let i=0;i<snake.length;i++){
+        const s = snake[i];
+        // head styled differently
+        if(i===snake.length-1){
+          drawCell(s.x, s.y, {gradient:['#00ffd0','#00a88a']});
+          // draw eyes on head
+          drawEyes(s);
+        }else{
+          drawCell(s.x, s.y, {fill:'#0bd294'});
+        }
+      }
+
+      // overlay score (small, top-left)
+      ctx.save();
+      ctx.font = Math.max(12, Math.floor(SETTINGS.cellSize*0.6)) + 'px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillText('Score: ' + score, 6, 18);
+      ctx.restore();
+    }
+
+    function drawEyes(head){
+      const cs = SETTINGS.cellSize; const px = head.x*cs; const py = head.y*cs;
+      const size = Math.max(2, Math.floor(cs*0.12));
+      ctx.save();
+      ctx.fillStyle = '#001418';
+      // determine eye offset by current direction
+      let ox = 0, oy = 0;
+      if(direction.x>0) { ox = cs*0.18; oy = -cs*0.12; }
+      else if(direction.x<0){ ox = -cs*0.18; oy = -cs*0.12; }
+      else if(direction.y>0){ ox = -cs*0.12; oy = cs*0.18; }
+      else if(direction.y<0){ ox = -cs*0.12; oy = -cs*0.18; }
+      const ex1 = px + cs*0.32 + ox;
+      const ey1 = py + cs*0.28 + oy;
+      const ex2 = px + cs*0.68 + ox;
+      const ey2 = py + cs*0.28 + oy;
+      ctx.beginPath(); ctx.arc(ex1, ey1, size, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2, ey2, size, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
+    // ---------- Game mechanics ----------
+    function gameTick(){
+      if(!running || paused) return;
+
+      // apply buffered direction if valid
+      if(nextDirection){
+        // prevent reversing into yourself
+        if(!(nextDirection.x === -direction.x && nextDirection.y === -direction.y)){
+          direction = nextDirection;
+        }
+        nextDirection = null;
+      }
+
+      const head = snake[snake.length-1];
+      const newHead = {x: head.x + direction.x, y: head.y + direction.y};
+
+      // wrap-around behavior (optional) — here we wrap
+      if(newHead.x < 0) newHead.x = SETTINGS.gridCount-1;
+      if(newHead.x >= SETTINGS.gridCount) newHead.x = 0;
+      if(newHead.y < 0) newHead.y = SETTINGS.gridCount-1;
+      if(newHead.y >= SETTINGS.gridCount) newHead.y = 0;
+
+      // collision with self?
+      if(snake.some(s => s.x===newHead.x && s.y===newHead.y)){
+        // game over
+        beep(120,0.12,'sawtooth',0.08);
+        running = false;
+        paused = false;
+        startBtn.textContent = 'Bắt đầu';
+        // flash effect
+        flashBoard();
+        return;
+      }
+
+      // move snake
+      snake.push(newHead);
+
+      // ate apple?
+      if(apple && newHead.x===apple.x && newHead.y===apple.y){
+        score += 10;
+        // speed up a bit
+        adjustSpeedOnEat();
+        placeApple();
+        updateScore();
+        beep(880,0.05,'sine',0.02);
+      }else{
+        // remove tail
+        snake.shift();
+      }
+
+      render();
+    }
+
+    function adjustSpeedOnEat(){
+      // slight increase of fps with cap
+      const maxFps = 20;
+      SETTINGS.fps = Math.min(maxFps, SETTINGS.fps + 0.25);
+      speedRange.value = Math.round(SETTINGS.fps);
+      fpsVal.textContent = Math.round(SETTINGS.fps);
+      restartLoop();
+    }
+
+    function flashBoard(){
+      const orig = canvas.style.boxShadow;
+      canvas.style.boxShadow = '0 0 0 6px rgba(255,255,255,0.06)';
+      setTimeout(()=>{ canvas.style.boxShadow = orig; render(); }, 120);
+    }
+
+    // ---------- Loop control ----------
+    function startGame(){
+      if(!running){
+        running = true;
+        paused = false;
+        startBtn.textContent = 'Đang chạy';
+      }
+      restartLoop();
+    }
+
+    function pauseGame(){
+      if(!running) return;
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Tiếp tục' : 'Tạm dừng';
+      if(!paused){ render(); }
+    }
+
+    function restartLoop(){
+      if(tickInterval) clearInterval(tickInterval);
+      const ms = 1000 / SETTINGS.fps;
+      tickInterval = setInterval(gameTick, ms);
+    }
+
+    function stopGame(){
+      running = false; paused = false;
+      if(tickInterval) clearInterval(tickInterval);
+      startBtn.textContent = 'Bắt đầu';
+      pauseBtn.textContent = 'Tạm dừng';
+    }
+
+    // ---------- Input handling ----------
+    window.addEventListener('keydown', (e)=>{
+      const key = e.key;
+      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(key)){
+        e.preventDefault();
+      }
+      if(key==='ArrowUp' || key==='w' || key==='W') nextDirection = {x:0,y:-1};
+      if(key==='ArrowDown' || key==='s' || key==='S') nextDirection = {x:0,y:1};
+      if(key==='ArrowLeft' || key==='a' || key==='A') nextDirection = {x:-1,y:0};
+      if(key==='ArrowRight' || key==='d' || key==='D') nextDirection = {x:1,y:0};
+      // space to pause
+      if(key===' '){ pauseGame(); }
+      // R to reset
+      if(key==='r' || key==='R') { resetGame(); render(); }
+    });
+
+    // Touch (swipe) for mobile
+    canvas.addEventListener('touchstart', (e)=>{
+      if(e.touches.length===1){
+        const t = e.touches[0]; touchStart = {x:t.clientX, y:t.clientY};
+      }
+    }, {passive: true});
+
+    canvas.addEventListener('touchmove', (e)=>{ e.preventDefault(); }, {passive:false});
+
+    canvas.addEventListener('touchend', (e)=>{
+      if(!touchStart) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStart.x; const dy = t.clientY - touchStart.y;
+      if(Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) { touchStart = null; return; }
+      if(Math.abs(dx) > Math.abs(dy)){
+        // horizontal
+        nextDirection = dx>0 ? {x:1,y:0} : {x:-1,y:0};
+      }else{
+        nextDirection = dy>0 ? {x:0,y:1} : {x:0,y:-1};
+      }
+      touchStart = null;
+    });
+
+    // Click / tap to pause
+    canvas.addEventListener('click', ()=>{ pauseGame(); });
+
+    // Buttons
+    startBtn.addEventListener('click', ()=>{ startGame(); });
+    pauseBtn.addEventListener('click', ()=>{ pauseGame(); });
+    resetBtn.addEventListener('click', ()=>{ stopGame(); resetGame(); render(); });
+
+    gridSelect.addEventListener('change', ()=>{
+      SETTINGS.gridCount = parseInt(gridSelect.value,10);
+      computeCellSize();
+      resetGame(false);
+      render();
+    });
+
+    speedRange.addEventListener('input', ()=>{
+      SETTINGS.fps = Number(speedRange.value);
+      fpsVal.textContent = Math.round(SETTINGS.fps);
+      if(running && !paused) restartLoop();
+    });
+
+    toggleSoundBtn.addEventListener('click', ()=>{
+      SETTINGS.sound = !SETTINGS.sound;
+      toggleSoundBtn.textContent = SETTINGS.sound ? 'Tắt âm' : 'Bật âm';
+    });
+
+    exportBtn.addEventListener('click', ()=>{
+      const cfg = {grid:SETTINGS.gridCount, fps: Math.round(SETTINGS.fps), highScore};
+      const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'snake-config.json'; document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // ---------- Responsive canvas setup ----------
+    function fitCanvasToContainer(){
+      const rect = canvas.getBoundingClientRect();
+      // prefer square canvas: min of width/height of container
+      const maxSize = Math.min(rect.width, window.innerHeight - 120);
+      canvas.width = Math.floor(maxSize);
+      canvas.height = Math.floor(maxSize);
+      SETTINGS.width = canvas.width; SETTINGS.height = canvas.height;
+      computeCellSize();
+      render();
+    }
+
+    // handle resize
+    let resizeTimer = null;
+    window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer = setTimeout(()=>{ fitCanvasToContainer(); }, 120); });
+
+    // ---------- Init ----------
+    (function init(){
+      // set initial FPS display
+      fpsVal.textContent = SETTINGS.fps;
+
+      // fit canvas and compute cell sizes after DOM layout
+      setTimeout(()=>{ fitCanvasToContainer(); }, 30);
+
+      // load high score
+      loadHighScore();
+
+      // default reset
+      resetGame(true);
+      render();
+
+      // show small ready beep
+      setTimeout(()=>{ beep(660,0.04,'triangle',0.02); }, 350);
+    })();
+
+    // expose for debugging (only in dev)
+    window.SNAKE_GAME = {resetGame, startGame, stopGame, render};
+
+    /*
+      NOTES for maintainers:
+      - This single-file implementation is intentionally verbose and commented
+        for learning and easy embedding in WebView.
+      - To publish on GitHub Pages, save this as index.html and push to repo.
+      - For native Android, embed in a WebView inside an Activity and enable JS.
+    */
+  </script></body>
+</html>
